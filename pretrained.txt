@@ -1,0 +1,76 @@
+import torch
+import torch.nn as nn
+from torchvision import models
+
+class UNetWithBackbone(nn.Module):
+    def __init__(self, n_classes):
+        super(UNetWithBackbone, self).__init__()
+
+        # Charger ResNet pré-entraîné comme backbone
+        backbone = models.resnet34(pretrained=True)
+        self.encoder = nn.Sequential(*list(backbone.children())[:-2])  # Supprimer la tête de classification
+
+        # Decoder (Upsampling)
+        self.decoder = nn.Sequential(
+            nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2),  # Upsample
+            nn.ReLU(),
+            nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2),  # Upsample
+            nn.ReLU(),
+            nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2),  # Upsample
+            nn.ReLU(),
+            nn.ConvTranspose2d(64, n_classes, kernel_size=2, stride=2)  # Sortie (n_classes canaux)
+        )
+
+    def forward(self, x):
+        # Encoder
+        x1 = self.encoder(x)
+
+
+
+
+import torch.optim as optim
+import torch.nn.functional as F
+
+# Optimiseur (SGD avec momentum)
+optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=1e-4)
+
+# Fonction de perte (CrossEntropyLoss pour segmentation multi-classe)
+criterion = nn.CrossEntropyLoss()
+
+# Exemple d'entraînement
+num_epochs = 10
+for epoch in range(num_epochs):
+    model.train()
+    
+    # Dummy data pour illustration
+    inputs = torch.randn(24, 3, 256, 256)  # Batch de 24 images 256x256
+    targets = torch.randint(0, 5, (24, 256, 256))  # Cibles pour 5 classes
+    
+    # Zero les gradients
+    optimizer.zero_grad()
+
+    # Passage avant
+    outputs = model(inputs)
+
+    # Calculer la perte
+    loss = criterion(outputs, targets)
+
+    # Backpropagation
+    loss.backward()
+
+    # Mise à jour des poids
+    optimizer.step()
+
+    print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
+
+        
+        # Decoder
+        x2 = self.decoder(x1)
+        
+        return x2
+
+# Créer le modèle U-Net avec un nombre de classes de sortie (par exemple, 5 classes)
+model = UNetWithBackbone(n_classes=5)
+
+# Vérifier le modèle
+print(model)
