@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
-import matplotlib as plt
+import matplotlib.pyplot as plt
 
 def visualize_predictions(model, dataset, device, num_images=5):
     model.eval()

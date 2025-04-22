@@ -34,3 +34,4 @@ class SatelliteDataset(Dataset):
             mask = torch.tensor(mask, dtype=torch.long)
 
         return image, mask
+

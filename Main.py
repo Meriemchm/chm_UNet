@@ -5,22 +5,26 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader, random_split
 import torch.nn.functional as F
 from Metrics import SegmentationMetrics
-import matplotlib.pyplot as plt
 from tqdm import tqdm
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
+import segmentation_models_pytorch as smp
 
 #======================== My files =========================
-from unet import UNet
+#from unet import UNet
+from NestedUnet import LightNestedUNet
 from SatelliteDataClass import SatelliteDataset
 from utilities import visualize_predictions
 
-def train():
+def train(NUM_CLASSES):
     # ======================== 2. Train / Validation Split ========================= #
-    images_path = "D:/Documents/telechargement/dubai_2/images_256"
-    masks_path = "D:/Documents/telechargement/dubai_2/masks_256"
+    images_path_train = "D:/Documents/telechargement/dataset_split/train/images"
+    masks_path_train = "D:/Documents/telechargement/dataset_split/train/binary masks"
 
-    train_transform = A.Compose([
+    images_path_val = "D:/Documents/telechargement/dataset_split/val/images"
+    masks_path_val = "D:/Documents/telechargement/dataset_split/val/binary masks"
+
+    """train_transform = A.Compose([
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.5),
         A.RandomRotate90(p=0.5),
@@ -34,23 +38,28 @@ def train():
     val_transform = A.Compose([
         A.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)),
         ToTensorV2()
-    ])
+    ])"""
 
-    full_dataset = SatelliteDataset(images_path, masks_path)
+    # D:/Documents/telechargement/dubai_2/masks_256_1 D:/Documents/telechargement/dubai_2/images_256
+
+    """full_dataset = SatelliteDataset(images_path, masks_path)
     train_size = int(0.8 * len(full_dataset))
     val_size = len(full_dataset) - train_size
-    train_indices, val_indices = random_split(range(len(full_dataset)), [train_size, val_size])
+    #train_indices, val_indices = random_split(range(len(full_dataset)), [train_size, val_size])
 
-    #train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size])
+    train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size])"""
 
-    train_dataset = torch.utils.data.Subset(
-        SatelliteDataset(images_path, masks_path, transform=train_transform),
+    """train_dataset = torch.utils.data.Subset(
+        SatelliteDataset(images_path, masks_path),
         train_indices
     )
     val_dataset = torch.utils.data.Subset(
-        SatelliteDataset(images_path, masks_path, transform=val_transform),
+        SatelliteDataset(images_path, masks_path),
         val_indices
-    )
+    )"""
+
+    train_dataset = SatelliteDataset(images_path_train, masks_path_train)
+    val_dataset = SatelliteDataset(images_path_val, masks_path_val)
 
     train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True, num_workers=6, pin_memory=True)
     val_loader = DataLoader(val_dataset, batch_size=16, shuffle=False, num_workers=6, pin_memory=True)
@@ -58,7 +67,8 @@ def train():
 
     # ======================== 3. Modèle U-Net ========================= #
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = UNet(in_channels=3, out_channels=6).to(device)
+    #model = UNet(in_channels=3, out_channels=NUM_CLASSES).to(device)
+    model = LightNestedUNet(in_channels=3, out_channels=NUM_CLASSES).to(device)
 
     # ======================== 4. Optimiseur & Loss ========================= #
     class DiceLoss(nn.Module):
@@ -83,20 +93,21 @@ def train():
         def forward(self, preds, targets):
             return 0.5 * self.dice(preds, targets) + 0.5 * self.ce(preds, targets)
 
-    criterion = CombinedLoss().to(device)
+    criterion = nn.CrossEntropyLoss().to(device)
+    #criterion = smp.losses.DiceLoss(mode='binary').to(device)
     optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-4)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3)
 
     # ======================== 5. Entraînement & Validation ========================= #
-    num_epochs = 50
+    num_epochs = 200
     scaler = torch.amp.GradScaler()
 
     # === Early stopping === #
     best_val_loss = float('inf')
-    patience = 15
+    patience = 35
     patience_counter = 0
 
-    metrics = SegmentationMetrics(num_classes=7)
+    metrics = SegmentationMetrics(num_classes=NUM_CLASSES)
 
     for epoch in range(num_epochs):
         model.train()
@@ -159,7 +170,6 @@ def train():
                            f"Train Loss: {avg_train_loss:.4f}, "
                            f"Train Dice: {train_dice/len(train_loader):.4f}, "
                            f"Train IoU: {train_iou/len(train_loader):.4f}, "
-                        
                            f"Val Loss: {avg_val_loss:.4f}, "
                            f"Val Dice: {val_dice/len(val_loader):.4f}, "
                            f"Val IoU: {val_iou/len(val_loader):.4f}, "
@@ -170,7 +180,6 @@ def train():
               f"Train Loss: {avg_train_loss:.4f}, "
               f"Train Dice: {train_dice/len(train_loader):.4f}, "
               f"Train IoU: {train_iou/len(train_loader):.4f}, "
-               
               f"Val Loss: {avg_val_loss:.4f}, "
               f"Val Dice: {val_dice/len(val_loader):.4f}, "
               f"Val IoU: {val_iou/len(val_loader):.4f}, "
@@ -182,7 +191,7 @@ def train():
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             patience_counter = 0
-            torch.save(model.state_dict(), "best6_unet_model_dubai.pth")
+            torch.save(model.state_dict(), "unetplusplus_cds.pth")
             print("! Nouveau meilleur modèle sauvegardé.")
         else:
             patience_counter += 1
@@ -192,24 +201,26 @@ def train():
             print("!!! Early stopping activé.")
             break
 
-    print(" Entraînement terminé. Le meilleur modèle a été sauvegardé sous 'best5_unet_model_dubai.pth'.")
+    print(" Entraînement terminé. Le meilleur modèle a été sauvegardé sous 'unetplusplus_cds.pth'.")
 
 # ======================== 7. Main Protection ========================= #
 if __name__ == '__main__':
     import torch.multiprocessing as mp
     mp.set_start_method('spawn')
-    train()
+    NUM_CLASSES = 4
+    train(NUM_CLASSES)
 
     # gpu
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = UNet(in_channels=3, out_channels=6).to(device)
-    model.load_state_dict(torch.load("best5_unet_model_dubai.pth", map_location=device))
+    #model = UNet(in_channels=3, out_channels=NUM_CLASSES).to(device)
+    model = LightNestedUNet(in_channels=3, out_channels=NUM_CLASSES).to(device)
+    model.load_state_dict(torch.load("training_logs_land.pth", map_location=device))
 
     # dataset validation
-    images_path = "D:/Documents/telechargement/dubai_2/images_256"
-    masks_path = "D:/Documents/telechargement/dubai_2/masks_256"
+    images_path = "D:/Documents/telechargement/landcoverv2/output_256/images"
+    masks_path = "D:/Documents/telechargement/landcoverv2/output_256/masks"
     full_dataset = SatelliteDataset(images_path, masks_path)
-    _, val_dataset = random_split(full_dataset, [int(0.8 * len(full_dataset)), len(full_dataset) - int(0.8 * len(full_dataset))])
+    #_, val_dataset = random_split(full_dataset, [int(0.8 * len(full_dataset)), len(full_dataset) - int(0.8 * len(full_dataset))])
 
     # Visualisation
-    visualize_predictions(model, val_dataset, device)
+    visualize_predictions(model, full_dataset, device)

@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+from timm.layers import DropBlock2d
 
 class DoubleConv(nn.Module):
-    def __init__(self, in_channels, out_channels, dropout=0.3):
+    def __init__(self, in_channels, out_channels, drop_prob=0.1,block_size=5):
         super(DoubleConv, self).__init__()
         self.conv = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
@@ -12,7 +12,7 @@ class DoubleConv(nn.Module):
             nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
-            nn.Dropout(dropout)
+            DropBlock2d(drop_prob=drop_prob, block_size=block_size)
         )
 
     def forward(self, x):
@@ -20,7 +20,7 @@ class DoubleConv(nn.Module):
 
 
 class UNet(nn.Module):
-    def __init__(self, in_channels=3, out_channels=6):
+    def __init__(self, in_channels=3, out_channels=4):
         super(UNet, self).__init__()
 
         # Encoder
@@ -30,15 +30,15 @@ class UNet(nn.Module):
         self.encoder2 = DoubleConv(64, 128)
         self.pool2 = nn.MaxPool2d(2)
 
-        self.encoder3 = DoubleConv(128, 256)
-        self.pool3 = nn.MaxPool2d(2)
+        """self.encoder3 = DoubleConv(128, 256)
+        self.pool3 = nn.MaxPool2d(2)"""
 
         # Bottleneck
-        self.bottleneck = DoubleConv(256, 512)
+        self.bottleneck = DoubleConv(128, 256) #256, 512
 
         # Decoder
-        self.upconv3 = nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2)
-        self.decoder3 = DoubleConv(256 + 256, 256)
+        """self.upconv3 = nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2)
+        self.decoder3 = DoubleConv(256 + 256, 256)"""
 
         self.upconv2 = nn.ConvTranspose2d(256, 128, kernel_size=2, stride=2)
         self.decoder2 = DoubleConv(128 + 128, 128)
@@ -57,16 +57,16 @@ class UNet(nn.Module):
         enc2 = self.encoder2(x)
         x = self.pool2(enc2)
 
-        enc3 = self.encoder3(x)
-        x = self.pool3(enc3)
+        """enc3 = self.encoder3(x)
+        x = self.pool3(enc3)"""
 
         # Bottleneck
         x = self.bottleneck(x)
 
         # Decoder
-        x = self.upconv3(x)
+        """x = self.upconv3(x)
         x = torch.cat([x, enc3], dim=1)
-        x = self.decoder3(x)
+        x = self.decoder3(x)"""
 
         x = self.upconv2(x)
         x = torch.cat([x, enc2], dim=1)
