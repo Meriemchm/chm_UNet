@@ -1,0 +1,10 @@
+# Fichiers Python compilés
+__pycache__/
+*.py[cod]
+*.so
+
+output*/**
+  # dossier contenant les modèles, logs, résultats
+
+
+

@@ -26,6 +26,18 @@ class SegmentationMetrics:
             union = torch.sum(pred_i) + torch.sum(target_i) - intersection
             iou += intersection / (union + 1e-6)
         return iou / self.num_classes
+    
+    def calculate_f1_score(self, preds, targets):
+        preds = torch.argmax(preds, dim=1)
+        f1 = 0.0
+        for i in range(self.num_classes):
+            pred_i = (preds == i).float()
+            target_i = (targets == i).float()
+            intersection = torch.sum(pred_i * target_i)
+            precision = intersection / (torch.sum(pred_i) + 1e-6)
+            recall = intersection / (torch.sum(target_i) + 1e-6)
+            f1 += (2 * precision * recall) / (precision + recall + 1e-6)
+        return f1 / self.num_classes
 
     def calculate_pixel_accuracy(self, preds, targets):
         preds = torch.argmax(preds, dim=1)

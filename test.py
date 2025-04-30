@@ -2,12 +2,13 @@ import torch
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-from NestedUnet import  LightNestedUNet
+#from unet import  UNet
+from FcnModel import SimpleFCN
 
 # ==================== 1. Charger le modèle ==================== #
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = LightNestedUNet(in_channels=3, out_channels=4).to(device)
-model.load_state_dict(torch.load("unetplusplus_cds.pth", map_location=device))
+model = SimpleFCN(in_channels=3, out_channels=4).to(device)
+model.load_state_dict(torch.load("best_FCN_model.pth", map_location=device))
 model.eval()
 
 # ==================== 2. Palette des classes ==================== #
@@ -48,8 +49,8 @@ def load_true_mask(mask_path):
     return colorize_mask(mask)
 
 # ==================== 6. Tester une image ==================== #
-image_path = "D:/Documents/telechargement/dataset_split/test/images/kunshan_S2_20240731_10m_CF_crop_a3_v2_207.png"
-mask_path = "D:/Documents/telechargement/dataset_split/test/binary masks/kunshan_S2_20240731_10m_CF_crop_a3_v2_207.png"
+image_path = "D:/Documents/telechargement/dataset_split/test/images/seychelles_S2_20211125_CF_v7_patch_0_5376.png"
+mask_path = "D:/Documents/telechargement/dataset_split/test/binary masks/seychelles_S2_20211125_CF_v7_patch_0_5376.png"
 
 """image_path = "D:/Documents/telechargement/dataset_split/images_256_1/kunshan_S2_20240731_10m_CF_crop_a3_v2_9.png"
 mask_path = "D:/Documents/telechargement/dataset_split/masks_256_1/kunshan_S2_20240731_10m_CF_crop_a3_v2_9.png"
@@ -59,8 +60,8 @@ import os
 import random
 
 # ==================== 6. Choisir une image et un masque aléatoirement ==================== #
-"""image_dir = "D:/Documents/telechargement/dataset_split/test/images"
-mask_dir = "D:/Documents/telechargement/dataset_split/test/binary masks"
+"""image_dir = "D:/Documents/telechargement/dataset_splitV3/test/images"
+mask_dir = "D:/Documents/telechargement/dataset_splitV3/test/binary masks"
 
 image_files = os.listdir(image_dir)
 selected_image = random.choice(image_files)
@@ -72,6 +73,17 @@ original_image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
 pred_mask = predict(image_path)
 colored_pred = colorize_mask(pred_mask)
 true_mask = load_true_mask(mask_path)
+
+
+save_dir = "./test_results_fcn"
+if not os.path.exists(save_dir):
+    os.makedirs(save_dir)
+
+# Enregistrer les images et masques
+cv2.imwrite(os.path.join(save_dir, f"{os.path.basename(image_path)}_original.png"), cv2.cvtColor(original_image, cv2.COLOR_RGB2BGR))
+cv2.imwrite(os.path.join(save_dir, f"{os.path.basename(image_path)}_true_mask.png"), cv2.cvtColor(true_mask, cv2.COLOR_RGB2BGR))
+cv2.imwrite(os.path.join(save_dir, f"{os.path.basename(image_path)}_pred_mask.png"), cv2.cvtColor(colored_pred, cv2.COLOR_RGB2BGR))
+
 
 # ==================== 7. Affichage ==================== #
 fig, axes = plt.subplots(1, 5, figsize=(22, 5))
